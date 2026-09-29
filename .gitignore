@@ -8,7 +8,7 @@ __pycache__/
 .vscode/
 .idea/
 
-# Data & Models (Don't upload heavy files to GitHub)
+# Data & Models
 data/
 models/
 *.mp4
