@@ -1,0 +1,52 @@
+camera:
+  name: "Entrance_Cam"
+  source: "data/cam1_mall_entrance.mp4"
+
+analytics:
+  classes_to_track: [0]
+
+  zones:
+    - name: "Entrance"
+      color: [0, 255, 150]
+      alert_dwell_seconds: 180
+
+      polygon:
+        - [60, 10]
+        - [540, 10]
+        - [540, 190]
+        - [60, 190]
+
+    - name: "Stall"
+      color: [255, 215, 0]
+      alert_dwell_seconds: 480
+
+      polygon:
+        - [120, 375]
+        - [290, 375]
+        - [290, 480]
+        - [120, 480]
+
+    - name: "Seating"
+      color: [0, 200, 255]
+      alert_dwell_seconds: 900
+
+      polygon:
+        - [255, 225]
+        - [400, 225]
+        - [400, 340]
+        - [255, 340]
+
+    - name: "Shop_Entry"
+      color: [255, 100, 0]
+      alert_dwell_seconds: 300
+
+      polygon:
+        - [548, 110]
+        - [640, 110]
+        - [640, 300]
+        - [548, 300]
+
+model:
+  weights: "models/yolo11n.onnx"
+  confidence_threshold: 0.45
+  iou_threshold: 0.4

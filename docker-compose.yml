@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: multi-cam-rabbitmq
+    ports:
+      - "5672:5672"   # AMQP protocol port
+      - "15672:15672" # Management UI port
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  mongodb:
+    image: mongo:6.0
+    container_name: multi-cam-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: multi-cam-backend
+    ports:
+      - "8000:8000"
+    environment:
+      AMQP_URL: "amqp://guest:guest@rabbitmq:5672/"
+      MONGO_URL: "mongodb://mongodb:27017/"
+    depends_on:
+      - rabbitmq
+      - mongodb
+    volumes:
+      - ./data:/app/data
+
+volumes:
+  rabbitmq_data:
+  mongo_data:

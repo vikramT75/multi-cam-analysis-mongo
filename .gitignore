@@ -1,0 +1,21 @@
+# Environments
+venv/
+env/
+__pycache__/
+*.pyc
+
+# IDEs
+.vscode/
+.idea/
+
+# Data & Models (Don't upload heavy files to GitHub)
+data/
+models/
+*.mp4
+*.pt
+*.onnx
+*.engine
+
+# OS generated files
+.DS_Store
+Thumbs.db

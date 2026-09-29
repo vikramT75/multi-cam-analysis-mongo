@@ -1,0 +1,844 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Multi Cam Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+    <style>
+      body {
+        background-color: #030712;
+      }
+
+      /* Pulsing alert badge animation */
+      @keyframes pulse-ring {
+        0% {
+          box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6);
+        }
+        70% {
+          box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+        }
+      }
+      .alert-pulse {
+        animation: pulse-ring 1.5s ease-out infinite;
+      }
+
+      /* Sankey tooltip */
+      #sankey-tooltip {
+        position: absolute;
+        background: rgba(17, 24, 39, 0.95);
+        border: 1px solid #374151;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 12px;
+        color: #e5e7eb;
+        pointer-events: none;
+        display: none;
+      }
+
+      /* Smooth KPI number transitions */
+      .kpi-value {
+        transition: color 0.3s ease;
+      }
+      .kpi-flash {
+        color: #34d399 !important;
+      }
+
+      /* Chart grid colour */
+      :root {
+        --chart-grid: #1f2937;
+      }
+    </style>
+  </head>
+
+  <body class="text-gray-100 min-h-screen font-sans">
+    <div
+      class="border-b border-gray-800 px-8 py-4 flex items-center justify-between"
+    >
+      <div>
+        <h1 class="text-2xl font-bold text-white tracking-tight">
+          Multi Cam Analysis
+        </h1>
+        <p class="text-xs text-gray-500 mt-0.5">Multi-camera edge analytics</p>
+      </div>
+      <div class="flex items-center gap-4">
+        <span class="text-xs text-gray-500"
+          >Last update:
+          <span id="last-update-time" class="text-gray-300">—</span></span
+        >
+        <div
+          id="conn-badge"
+          class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gray-800 border border-gray-700 text-gray-400"
+        >
+          <span class="w-2 h-2 rounded-full bg-gray-500"></span>
+          Connecting…
+        </div>
+      </div>
+    </div>
+
+    <div class="px-8 py-6 max-w-screen-2xl mx-auto space-y-6">
+      <div id="kpi-container" class="space-y-6">
+        <!-- Dynamically populated by JS per camera -->
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-3 space-y-4">
+          <h2
+            class="text-xs text-gray-500 uppercase tracking-widest font-semibold"
+          >
+            Active Edge Nodes
+          </h2>
+          <div id="camera-grid" class="space-y-4"></div>
+        </div>
+
+        <!-- Hidden for now: Sankey diagram will be re-enabled later -->
+        <div class="lg:col-span-1 hidden">
+          <h2
+            class="text-xs text-gray-500 uppercase tracking-widest font-semibold mb-3"
+          >
+            Conversion Flow (Sankey)
+          </h2>
+          <div
+            class="bg-gray-900 border border-gray-800 rounded-xl p-4 relative"
+          >
+            <svg id="sankey-svg" class="w-full" style="height: 320px"></svg>
+            <div id="sankey-tooltip"></div>
+
+            <div class="mt-3 border-t border-gray-800 pt-3 space-y-2">
+              <p class="text-xs text-gray-600 uppercase tracking-widest">
+                Mall (Cam 1)
+              </p>
+              <div class="flex flex-wrap gap-3">
+                <div class="flex items-center gap-1.5 text-xs text-gray-400">
+                  <span
+                    class="w-3 h-3 rounded-sm"
+                    style="background: #00ff96"
+                  ></span>
+                  Entrance
+                </div>
+                <div class="flex items-center gap-1.5 text-xs text-gray-400">
+                  <span
+                    class="w-3 h-3 rounded-sm"
+                    style="background: #ffd700"
+                  ></span>
+                  Stall
+                </div>
+                <div class="flex items-center gap-1.5 text-xs text-gray-400">
+                  <span
+                    class="w-3 h-3 rounded-sm"
+                    style="background: #00c8ff"
+                  ></span>
+                  Seating
+                </div>
+                <div class="flex items-center gap-1.5 text-xs text-gray-400">
+                  <span
+                    class="w-3 h-3 rounded-sm"
+                    style="background: #ff6400"
+                  ></span>
+                  Shop
+                </div>
+              </div>
+              <p class="text-xs text-gray-600 uppercase tracking-widest pt-1">
+                Utensils (Cam 2)
+              </p>
+              <div class="flex flex-wrap gap-3">
+                <div class="flex items-center gap-1.5 text-xs text-gray-400">
+                  <span
+                    class="w-3 h-3 rounded-sm"
+                    style="background: #ffa500"
+                  ></span>
+                  Pots
+                </div>
+                <div class="flex items-center gap-1.5 text-xs text-gray-400">
+                  <span
+                    class="w-3 h-3 rounded-sm"
+                    style="background: #00c800"
+                  ></span>
+                  Cups
+                </div>
+                <div class="flex items-center gap-1.5 text-xs text-gray-400">
+                  <span
+                    class="w-3 h-3 rounded-sm"
+                    style="background: #1e90ff"
+                  ></span>
+                  Plates
+                </div>
+                <div class="flex items-center gap-1.5 text-xs text-gray-400">
+                  <span
+                    class="w-3 h-3 rounded-sm"
+                    style="background: #ff3c3c"
+                  ></span>
+                  Bowls
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between mb-3">
+          <h2
+            class="text-xs text-gray-500 uppercase tracking-widest font-semibold"
+          >
+            Zone Traffic — Rolling Window
+          </h2>
+          <div id="chart-legend" class="flex gap-4 text-xs text-gray-400"></div>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+          <div style="height: 220px">
+            <canvas id="historyChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div id="alert-panel" class="hidden">
+        <h2
+          class="text-xs text-gray-500 uppercase tracking-widest font-semibold mb-3"
+        >
+          🚨 Active Alerts
+        </h2>
+        <div id="alert-list" class="space-y-2"></div>
+      </div>
+    </div>
+
+    <script>
+      "use strict";
+
+      const WS_URL = "ws://localhost:8000/ws";
+      const ZONE_ORDER = [
+        "Entrance",
+        "Aisle",
+        "Stall",
+        "Seating",
+        "Shop_Entry",
+        "Cups",
+        "Pots",
+        "Plates",
+        "Bowls",
+      ];
+      const ZONE_COLORS = {
+        Entrance: "#00ff96",
+        Aisle: "#ffc800",
+        Stall: "#ffd700",
+        Seating: "#00c8ff",
+        Shop_Entry: "#ff6400",
+
+        Pots: "#ffa500",
+        Cups: "#00c800",
+        Plates: "#1e90ff",
+        Bowls: "#ff3c3c",
+      };
+
+      const EXTRA_COLORS = ["#a78bfa", "#f87171", "#34d399", "#fb923c"];
+      const MAX_HISTORY_POINTS = 60;
+
+      const cameraStates = {};
+      const zoneHistory = {};
+      let activeAlerts = {};
+
+      function zoneColor(name) {
+        return (
+          ZONE_COLORS[name] ||
+          EXTRA_COLORS[Object.keys(ZONE_COLORS).length % EXTRA_COLORS.length]
+        );
+      }
+
+      function fmtSeconds(s) {
+        if (!s || s <= 0) return "—";
+        const m = Math.floor(s / 60);
+        const sec = Math.round(s % 60);
+        return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+      }
+
+      function flashElement(el) {
+        el.classList.add("kpi-flash");
+        setTimeout(() => el.classList.remove("kpi-flash"), 600);
+      }
+
+      const histCtx = document.getElementById("historyChart").getContext("2d");
+      const histChart = new Chart(histCtx, {
+        type: "line",
+        data: { labels: [], datasets: [] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false },
+          scales: {
+            x: {
+              display: true,
+              ticks: { color: "#4b5563", maxTicksLimit: 8, font: { size: 10 } },
+              grid: { color: "#111827" },
+            },
+            y: {
+              beginAtZero: true,
+              ticks: { color: "#4b5563", stepSize: 1 },
+              grid: { color: "#1f2937" },
+            },
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: "#111827",
+              borderColor: "#374151",
+              borderWidth: 1,
+              titleColor: "#9ca3af",
+              bodyColor: "#e5e7eb",
+            },
+          },
+          animation: false,
+          elements: { point: { radius: 0 } },
+        },
+      });
+
+      function ensureZoneDataset(zoneName) {
+        const exists = histChart.data.datasets.find(
+          (d) => d.label === zoneName,
+        );
+        if (exists) return;
+
+        const color = zoneColor(zoneName);
+        histChart.data.datasets.push({
+          label: zoneName,
+          data: [],
+          borderColor: color,
+          backgroundColor: color + "18",
+          borderWidth: 2,
+          fill: true,
+          tension: 0.4,
+        });
+
+        const legend = document.getElementById("chart-legend");
+        const item = document.createElement("div");
+        item.className = "flex items-center gap-1.5";
+        item.innerHTML = `<span class="w-2.5 h-2.5 rounded-full" style="background:${color}"></span>
+                      <span>${zoneName}</span>`;
+        legend.appendChild(item);
+
+        histChart.update("none");
+      }
+
+      function pushHistoryPoint(zoneName, occupancy) {
+        ensureZoneDataset(zoneName);
+
+        const now = new Date().toLocaleTimeString("en-GB", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+
+        const ds0 = histChart.data.datasets[0];
+        if (
+          zoneName === histChart.data.datasets[0]?.label ||
+          histChart.data.datasets.length === 0
+        ) {
+          histChart.data.labels.push(now);
+          if (histChart.data.labels.length > MAX_HISTORY_POINTS)
+            histChart.data.labels.shift();
+        }
+
+        const ds = histChart.data.datasets.find((d) => d.label === zoneName);
+        ds.data.push(occupancy);
+        if (ds.data.length > MAX_HISTORY_POINTS) ds.data.shift();
+      }
+
+      const historyTicks = [];
+
+      function recordHistoryTick(zoneStates) {
+        const now = new Date().toLocaleTimeString("en-GB", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+
+        for (const zoneName of Object.keys(zoneStates)) {
+          ensureZoneDataset(zoneName);
+        }
+
+        histChart.data.labels.push(now);
+        if (histChart.data.labels.length > MAX_HISTORY_POINTS)
+          histChart.data.labels.shift();
+
+        for (const ds of histChart.data.datasets) {
+          const occ = zoneStates[ds.label]?.occupancy ?? 0;
+          ds.data.push(occ);
+          if (ds.data.length > MAX_HISTORY_POINTS) ds.data.shift();
+        }
+
+        histChart.update("none");
+      }
+
+      function updateKPIs() {
+        const aggregated = {};
+
+        for (const camData of Object.values(cameraStates)) {
+          if (!camData.zones) continue;
+          for (const [zone, metrics] of Object.entries(camData.zones)) {
+            if (!aggregated[zone]) {
+              aggregated[zone] = {
+                occupancy: 0,
+                total_entered: 0,
+                avg_dwell: 0,
+                max_dwell: 0,
+                _count: 0,
+              };
+            }
+            aggregated[zone].occupancy += metrics.occupancy || 0;
+            aggregated[zone].total_entered += metrics.total_entered || 0;
+            aggregated[zone].avg_dwell += metrics.avg_dwell || 0;
+            aggregated[zone].max_dwell = Math.max(
+              aggregated[zone].max_dwell,
+              metrics.max_dwell || 0,
+            );
+            aggregated[zone]._count++;
+          }
+        }
+
+        for (const z of Object.values(aggregated)) {
+          if (z._count > 0) z.avg_dwell /= z._count;
+        }
+
+        const kpiContainer = document.getElementById("kpi-container");
+        if (!kpiContainer) return aggregated;
+
+        for (const [camName, camData] of Object.entries(cameraStates)) {
+          if (!camData.zones) continue;
+
+          let stripWrapper = document.getElementById(`kpi-wrapper-${camName}`);
+          if (!stripWrapper) {
+            stripWrapper = document.createElement("div");
+            stripWrapper.id = `kpi-wrapper-${camName}`;
+            stripWrapper.innerHTML = `
+                <h2 class="text-xs text-gray-500 uppercase tracking-widest font-semibold mb-3">${camName} Dwell Times</h2>
+                <div id="kpi-strip-${camName}" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
+            `;
+            kpiContainer.appendChild(stripWrapper);
+          }
+
+          const kpiStrip = document.getElementById(`kpi-strip-${camName}`);
+
+          const allZones = Object.keys(camData.zones);
+          const ordered = ZONE_ORDER.filter((z) => allZones.includes(z));
+          for (const z of allZones) {
+            if (!ordered.includes(z)) ordered.push(z);
+          }
+
+          for (const zone of ordered) {
+            const metrics = camData.zones[zone];
+
+            const cardId = `kpi-card-${camName}-${zone}`;
+            let card = document.getElementById(cardId);
+
+            if (!card) {
+              card = document.createElement("div");
+              card.id = cardId;
+              card.className =
+                "bg-gray-900 border border-gray-800 rounded-xl p-5";
+              card.innerHTML = `
+                    <p class="text-[11px] uppercase tracking-widest font-semibold" style="color: ${zoneColor(zone)}">${zone} Dwell</p>
+                    <p id="kpi-val-${camName}-${zone}" class="kpi-value text-3xl font-extrabold text-white mt-2">—</p>
+                    <p class="text-[11px] text-gray-500 mt-1">avg time spent</p>
+                `;
+              kpiStrip.appendChild(card);
+            }
+
+            const valEl = document.getElementById(`kpi-val-${camName}-${zone}`);
+            const newDwell = fmtSeconds(metrics.avg_dwell);
+
+            if (valEl.textContent !== newDwell) {
+              valEl.textContent = newDwell;
+            }
+          }
+
+          Array.from(kpiStrip.children).forEach((child) => {
+            const zoneName = child.id.replace(`kpi-card-${camName}-`, "");
+            if (!camData.zones[zoneName]) {
+              kpiStrip.removeChild(child);
+            }
+          });
+        }
+
+        Array.from(kpiContainer.children).forEach((child) => {
+          const cName = child.id.replace("kpi-wrapper-", "");
+          if (!cameraStates[cName]) {
+            kpiContainer.removeChild(child);
+          }
+        });
+
+        return aggregated;
+      }
+
+      function getOrCreateCameraCard(camName) {
+        const cardId = `card-${camName}`;
+        if (document.getElementById(cardId)) return;
+
+        const grid = document.getElementById("camera-grid");
+        const card = document.createElement("div");
+        card.id = cardId;
+        card.className = "bg-gray-900 border border-gray-800 rounded-xl p-5";
+        card.innerHTML = `
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-bold text-gray-300 uppercase tracking-wider">${camName}</h3>
+            <span id="cam-alert-${camName}" class="hidden text-xs font-semibold px-2 py-0.5 rounded-full bg-red-900 text-red-300 border border-red-700 alert-pulse">
+                ⚠ ALERT
+            </span>
+        </div>
+        <div id="zones-${camName}" class="grid grid-cols-2 md:grid-cols-3 gap-3"></div>
+    `;
+        grid.appendChild(card);
+      }
+
+      function renderZoneCard(camName, zoneName, metrics) {
+        const containerId = `zones-${camName}`;
+        const zoneId = `zone-${camName}-${zoneName}`;
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        const color = zoneColor(zoneName);
+
+        let zoneEl = document.getElementById(zoneId);
+        if (!zoneEl) {
+          zoneEl = document.createElement("div");
+          zoneEl.id = zoneId;
+          zoneEl.className = "rounded-lg p-3 border bg-gray-950";
+          zoneEl.style.borderColor = color + "60";
+          container.appendChild(zoneEl);
+        }
+
+        zoneEl.innerHTML = `
+        <p class="text-xs font-bold uppercase tracking-widest mb-2"
+           style="color:${color}">${zoneName}</p>
+        <div class="grid grid-cols-2 gap-y-1.5 text-sm">
+            <div>
+                <p class="text-gray-600 text-xs">Occupancy</p>
+                <p class="font-bold text-white text-xl">${metrics.occupancy ?? 0}</p>
+            </div>
+            <div>
+                <p class="text-gray-600 text-xs">Total In</p>
+                <p class="font-bold text-xl" style="color:${color}">${metrics.total_entered ?? 0}</p>
+            </div>
+            <div>
+                <p class="text-gray-600 text-xs">Avg Dwell</p>
+                <p class="font-semibold text-gray-300">${fmtSeconds(metrics.avg_dwell)}</p>
+            </div>
+            <div>
+                <p class="text-gray-600 text-xs">Max Dwell</p>
+                <p class="font-semibold text-gray-400">${fmtSeconds(metrics.max_dwell)}</p>
+            </div>
+        </div>
+    `;
+      }
+
+      function updateAlerts(camName, alerts) {
+        const camAlertBadge = document.getElementById(`cam-alert-${camName}`);
+        const panel = document.getElementById("alert-panel");
+        const list = document.getElementById("alert-list");
+
+        if (!alerts || alerts.length === 0) {
+          if (camAlertBadge) camAlertBadge.classList.add("hidden");
+          return;
+        }
+
+        if (camAlertBadge) camAlertBadge.classList.remove("hidden");
+        panel.classList.remove("hidden");
+
+        for (const alert of alerts) {
+          const key = `${camName}-${alert.zone}-${alert.track_id}`;
+          if (activeAlerts[key]) continue;
+
+          activeAlerts[key] = alert;
+
+          const item = document.createElement("div");
+          item.id = `alert-${key}`;
+          item.className =
+            "flex items-center gap-3 bg-red-950 border border-red-800 rounded-lg px-4 py-2 text-sm";
+          item.innerHTML = `
+            <span class="text-red-400 font-bold">${alert.type}</span>
+            <span class="text-gray-300">Zone <strong>${alert.zone}</strong> —
+            Track #${alert.track_id} for <strong>${alert.dwell_seconds}s</strong></span>
+            <span class="text-gray-500 text-xs ml-auto">${camName}</span>
+        `;
+          list.prepend(item);
+
+          setTimeout(() => {
+            item.remove();
+            delete activeAlerts[key];
+            if (list.children.length === 0) panel.classList.add("hidden");
+          }, 30000);
+        }
+      }
+
+      function buildAggregatedSankey() {
+        /**
+         * Aggregates cross-camera funnel data into a single Sankey dataset.
+         *
+         * Strategy:
+         *  - Node sizes = sum of `funnel[zone]` across all cameras (unique visitors per zone)
+         *  - Links between consecutive zones = min(source total, target total)
+         *    This is the best approximation without cross-camera Re-ID.
+         *  - Explicit within-camera transitions are also added (de-duplicated).
+         */
+        const funnel = {};
+        const explicit = {};
+
+        let hasGlobalData = false;
+
+        // The backend now sends global_funnel and global_transitions in EVERY camera payload.
+        // We just take the latest one since they are globally identical.
+        for (const camData of Object.values(cameraStates)) {
+          if (camData.global_funnel && camData.global_transitions) {
+            hasGlobalData = true;
+            Object.assign(funnel, camData.global_funnel);
+            Object.assign(explicit, camData.global_transitions);
+            break;
+          }
+        }
+
+        // Fallback if ReID hasn't kicked in yet
+        if (!hasGlobalData) {
+          for (const camData of Object.values(cameraStates)) {
+            if (camData.funnel) {
+              for (const [zone, cnt] of Object.entries(camData.funnel)) {
+                funnel[zone] = (funnel[zone] || 0) + cnt;
+              }
+            }
+            if (camData.transitions) {
+              for (const [frm, tos] of Object.entries(camData.transitions)) {
+                for (const [to, cnt] of Object.entries(tos)) {
+                  const k = `${frm}->${to}`;
+                  explicit[k] = (explicit[k] || 0) + cnt;
+                }
+              }
+            }
+          }
+        }
+
+        const allZones = Object.keys(funnel);
+        const ordered = ZONE_ORDER.filter((z) => allZones.includes(z));
+        for (const z of allZones) {
+          if (!ordered.includes(z)) ordered.push(z);
+        }
+
+        if (ordered.length < 2) return null;
+
+        const nodeIndex = {};
+        ordered.forEach((z, i) => {
+          nodeIndex[z] = i;
+        });
+        const nodes = ordered.map((name) => ({
+          name,
+          value: funnel[name] || 0,
+        }));
+        const linksMap = {};
+
+        for (let i = 0; i < ordered.length - 1; i++) {
+          const src = ordered[i],
+            dst = ordered[i + 1];
+          const val = Math.min(funnel[src] || 0, funnel[dst] || 0);
+          if (val > 0) {
+            const k = `${nodeIndex[src]}->${nodeIndex[dst]}`;
+            linksMap[k] = {
+              source: nodeIndex[src],
+              target: nodeIndex[dst],
+              value: val,
+            };
+          }
+        }
+
+        for (const [key, cnt] of Object.entries(explicit)) {
+          const [frm, to] = key.split("->");
+          if (!(frm in nodeIndex) || !(to in nodeIndex)) continue;
+          const k = `${nodeIndex[frm]}->${nodeIndex[to]}`;
+          if (linksMap[k]) {
+            linksMap[k].value = Math.max(linksMap[k].value, cnt);
+          } else {
+            linksMap[k] = {
+              source: nodeIndex[frm],
+              target: nodeIndex[to],
+              value: cnt,
+            };
+          }
+        }
+
+        return { nodes, links: Object.values(linksMap) };
+      }
+
+      function renderSankey() {
+        const svg = d3.select("#sankey-svg");
+        const svgEl = document.getElementById("sankey-svg");
+        const W = svgEl.clientWidth || 300;
+        const H = svgEl.clientHeight || 320;
+        const data = buildAggregatedSankey();
+
+        svg.selectAll("*").remove();
+
+        if (!data || data.nodes.length < 2 || data.links.length === 0) {
+          svg
+            .append("text")
+            .attr("x", W / 2)
+            .attr("y", H / 2)
+            .attr("text-anchor", "middle")
+            .attr("fill", "#374151")
+            .attr("font-size", "13px")
+            .text("Awaiting flow data…");
+          return;
+        }
+
+        const sankeyData = {
+          nodes: data.nodes.map((d) => ({ ...d })),
+          links: data.links.map((d) => ({ ...d })),
+        };
+
+        const sankey = d3
+          .sankey()
+          .nodeWidth(18)
+          .nodePadding(24)
+          .extent([
+            [12, 12],
+            [W - 80, H - 12],
+          ]);
+
+        let graph;
+        try {
+          graph = sankey(sankeyData);
+        } catch (e) {
+          console.warn("Sankey render error:", e);
+          return;
+        }
+
+        const tooltip = document.getElementById("sankey-tooltip");
+
+        svg
+          .append("g")
+          .selectAll("path")
+          .data(graph.links)
+          .join("path")
+          .attr("d", d3.sankeyLinkHorizontal())
+          .attr("fill", "none")
+          .attr("stroke", (d) => zoneColor(d.source.name))
+          .attr("stroke-width", (d) => Math.max(2, d.width))
+          .attr("stroke-opacity", 0.35)
+          .on("mouseover", function (event, d) {
+            d3.select(this).attr("stroke-opacity", 0.7);
+            tooltip.style.display = "block";
+            tooltip.textContent = `${d.source.name} → ${d.target.name}: ${d.value} objects`;
+          })
+          .on("mousemove", function (event) {
+            tooltip.style.left = event.pageX + 12 + "px";
+            tooltip.style.top = event.pageY - 28 + "px";
+          })
+          .on("mouseout", function () {
+            d3.select(this).attr("stroke-opacity", 0.35);
+            tooltip.style.display = "none";
+          });
+
+        const nodeG = svg
+          .append("g")
+          .selectAll("g")
+          .data(graph.nodes)
+          .join("g");
+
+        nodeG
+          .append("rect")
+          .attr("x", (d) => d.x0)
+          .attr("y", (d) => d.y0)
+          .attr("width", (d) => d.x1 - d.x0)
+          .attr("height", (d) => Math.max(4, d.y1 - d.y0))
+          .attr("fill", (d) => zoneColor(d.name))
+          .attr("rx", 3);
+
+        nodeG
+          .append("text")
+          .attr("x", (d) => (d.x0 < W / 2 ? d.x1 + 7 : d.x0 - 7))
+          .attr("y", (d) => (d.y1 + d.y0) / 2)
+          .attr("dy", "0.35em")
+          .attr("text-anchor", (d) => (d.x0 < W / 2 ? "start" : "end"))
+          .attr("fill", "#e5e7eb")
+          .attr("font-size", "12px")
+          .attr("font-weight", "600")
+          .text((d) => `${d.name} (${d.value || 0})`);
+      }
+
+      function handleTelemetry(camName, data) {
+        cameraStates[camName] = data;
+
+        getOrCreateCameraCard(camName);
+        if (data.zones) {
+          for (const [zone, metrics] of Object.entries(data.zones)) {
+            renderZoneCard(camName, zone, metrics);
+          }
+
+          recordHistoryTick(data.zones);
+        }
+
+        updateKPIs();
+
+        // Only render Sankey when its panel is visible (not hidden)
+        const sankeyPanel = document.getElementById("sankey-svg")?.closest(".hidden");
+        if (!sankeyPanel) renderSankey();
+
+        updateAlerts(camName, data.alerts);
+
+        document.getElementById("last-update-time").textContent =
+          new Date().toLocaleTimeString();
+      }
+
+      let ws;
+
+      function connectWebSocket() {
+        ws = new WebSocket(WS_URL);
+
+        ws.onopen = () => {
+          const badge = document.getElementById("conn-badge");
+          badge.className =
+            "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-950 border border-emerald-800 text-emerald-400";
+          badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span> Connected`;
+        };
+
+        ws.onmessage = (event) => {
+          let msg;
+          try {
+            msg = JSON.parse(event.data);
+          } catch {
+            return;
+          }
+
+          if (msg.type === "snapshot") {
+            for (const [cam, camData] of Object.entries(msg.cameras || {})) {
+              handleTelemetry(cam, camData);
+            }
+          } else if (msg.type === "update") {
+            handleTelemetry(msg.camera, msg);
+          }
+        };
+
+        ws.onclose = () => {
+          const badge = document.getElementById("conn-badge");
+          badge.className =
+            "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gray-900 border border-gray-700 text-gray-500";
+          badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-gray-600"></span> Reconnecting…`;
+          setTimeout(connectWebSocket, 2500);
+        };
+
+        ws.onerror = () => ws.close();
+      }
+
+      connectWebSocket();
+
+      let resizeTimer;
+      window.addEventListener("resize", () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          const sankeyPanel = document.getElementById("sankey-svg")?.closest(".hidden");
+          if (!sankeyPanel) renderSankey();
+        }, 150);
+      });
+    </script>
+  </body>
+</html>

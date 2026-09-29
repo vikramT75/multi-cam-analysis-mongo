@@ -1,0 +1,52 @@
+camera:
+  name: "Aisle_Cam"
+  source: "data/cam2_aisle_crowd.mp4"
+
+analytics:
+  classes_to_track: [0]
+
+  zones:
+    - name: "Pots"
+      color: [255, 165, 0]
+      alert_dwell_seconds: 360
+
+      polygon:
+        - [0, 45]
+        - [165, 45]
+        - [165, 355]
+        - [0, 355]
+
+    - name: "Cups"
+      color: [0, 200, 0]
+      alert_dwell_seconds: 360
+
+      polygon:
+        - [230, 240]
+        - [400, 240]
+        - [440, 400]
+        - [130, 400]
+
+    - name: "Plates"
+      color: [30, 144, 255]
+      alert_dwell_seconds: 360
+
+      polygon:
+        - [405, 45]
+        - [555, 45]
+        - [555, 325]
+        - [405, 325]
+
+    - name: "Bowls"
+      color: [255, 60, 60]
+      alert_dwell_seconds: 360
+
+      polygon:
+        - [532, 138]
+        - [720, 138]
+        - [720, 410]
+        - [532, 410]
+
+model:
+  weights: "models/yolo11n.onnx"
+  confidence_threshold: 0.45
+  iou_threshold: 0.4
