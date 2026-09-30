@@ -108,6 +108,19 @@ latest_state: dict[str, dict] = {}
 import os
 AMQP_URL = os.getenv("AMQP_URL", "amqp://guest:guest@localhost:5672/")
 
+def process_reid_sync(camera: str, signatures: dict, track_zones: dict) -> dict:
+    """Synchronous wrapper to run ReID logic in a separate thread."""
+    if signatures:
+        reid_manager.resolve_identities(camera, signatures)
+    if track_zones:
+        reid_manager.update_global_journeys(camera, track_zones)
+    
+    return {
+        "global_funnel": reid_manager.get_global_funnel(),
+        "global_transitions": reid_manager.get_global_transitions(),
+        "cross_camera_count": reid_manager.get_cross_camera_count()
+    }
+
 async def handle_telemetry_message(data: dict):
     """Processes a telemetry payload from RabbitMQ."""
     camera    = data.get("camera", "unknown")
@@ -116,14 +129,13 @@ async def handle_telemetry_message(data: dict):
     signatures = data.get("signatures", {})
     track_zones = data.get("track_zones", {})
 
-    if signatures:
-        reid_manager.resolve_identities(camera, signatures)
-    if track_zones:
-        reid_manager.update_global_journeys(camera, track_zones)
+    # Offload heavy CPU-bound ReID calculations to a thread 
+    # to avoid blocking FastAPI's WebSocket broadcasts
+    reid_results = await asyncio.to_thread(process_reid_sync, camera, signatures, track_zones)
 
-    data["global_funnel"]        = reid_manager.get_global_funnel()
-    data["global_transitions"]   = reid_manager.get_global_transitions()
-    data["cross_camera_count"]   = reid_manager.get_cross_camera_count()
+    data["global_funnel"]        = reid_results["global_funnel"]
+    data["global_transitions"]   = reid_results["global_transitions"]
+    data["cross_camera_count"]   = reid_results["cross_camera_count"]
 
     # Strip heavy data before DB insertion and WebSocket broadcast
     data.pop("signatures", None)

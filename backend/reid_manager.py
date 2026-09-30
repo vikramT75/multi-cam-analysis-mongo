@@ -19,6 +19,7 @@ Key design decisions:
 import time
 import logging
 import numpy as np
+import base64
 
 logger = logging.getLogger(__name__)
 
@@ -71,9 +72,14 @@ class ReIDManager:
         """
         self._purge_expired()
 
-        for local_tid, emb_list in signatures.items():
+        for local_tid, emb_data in signatures.items():
             key = (cam_name, str(local_tid))
-            emb = np.array(emb_list, dtype=np.float32)
+            
+            # Handle both Base64-encoded bytes (new) and float arrays (legacy)
+            if isinstance(emb_data, str):
+                emb = np.frombuffer(base64.b64decode(emb_data), dtype=np.float32)
+            else:
+                emb = np.array(emb_data, dtype=np.float32)
 
             # ── Already resolved: just refresh the gallery embedding ──
             if key in self._local_to_global:
@@ -192,5 +198,8 @@ class ReIDManager:
             self._local_to_global = {
                 k: v for k, v in self._local_to_global.items() if v != gid
             }
+            # FIX MEMORY LEAK: Clean up unbounded journey history
+            if gid in self._global_history:
+                del self._global_history[gid]
         if expired:
             logger.debug("Purged %d expired gallery entries.", len(expired))
